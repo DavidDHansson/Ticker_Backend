@@ -18,7 +18,6 @@ exports.newsscraper = functions
                     '--no-sandbox',
                     '--no-zygote',
                     '--single-process'
-
                 ],
                 defaultViewport: chromium.defaultViewport,
                 headless: chromium.headless
