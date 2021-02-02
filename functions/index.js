@@ -3,6 +3,7 @@ const puppeteer = require('puppeteer');
 const chromium = require('chrome-aws-lambda');
 
 exports.newsscraper = functions
+    .region("europe-west1")
     .runWith({ timeoutSeconds: 540, memory: "4GB" })
     .https.onRequest(async (req, res) => {
         
