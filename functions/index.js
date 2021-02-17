@@ -9,7 +9,7 @@ const db = admin.firestore();
 const puppeteer = require("puppeteer");
 const chromium = require("chrome-aws-lambda");
 
-exports.euroscraper = functions
+exports.euroinvestorscraper = functions
     .region("europe-west1")
     .runWith({timeoutSeconds: 540, memory: "4GB"})
     .https.onRequest(async (req, res) => {
@@ -49,8 +49,8 @@ exports.euroscraper = functions
       await browser.close();
 
       // Get 50 latest articles from Firestore
-      const articlesCollection = db.collection("articles");
-      const snapshot = await articlesCollection.where("provider", "==", "euroinvestor").orderBy("date").limit(50).get();
+      const articlesCollection = db.collection("euroinvestorarticles");
+      const snapshot = await articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").limit(40).get();
       const articles = [];
       snapshot.forEach((doc) => articles.push(doc.data()));
 
@@ -63,8 +63,8 @@ exports.euroscraper = functions
 
       // Add to Firebase Firestore collection
       for (let i = 0; i < final.length; i++) {
-        await db.collection("articles").add({...final[i], ...{date: admin.firestore.Timestamp.now()}});
+        await db.collection("euroinvestorarticles").add({...final[i], ...{date: admin.firestore.Timestamp.now()}});
       }
 
-      res.json({result: "success", time: ms, replaced: final});
+      res.json({result: "success", time: ms, placed: final});
     });
