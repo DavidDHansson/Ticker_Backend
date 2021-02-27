@@ -62,7 +62,13 @@ exports.euroinvestorscraper = functions
                 const link = article.querySelector("div a:last-child").href;
                 const img = article.childNodes.length == 2 ? article.querySelector("figure").getAttribute("data-original") : "";
 
-                data.push({title: title, link: link, img: img, provider: "euroinvestor"});
+                data.push({title: title, link: link, img: img,
+                    provider: "euroinvestor",
+                    providerText: "euroinvestor",
+                    providerLink: "https://www.euroinvestor.dk",
+                    providerImage: "http://4hansson.dk/test/ticker/euroinvestorlogo.png",
+                    displayDate: formatDate(new Date()),
+                });
             });
 
             return data;
@@ -91,3 +97,24 @@ exports.euroinvestorscraper = functions
 
         res.json({result: "success", time: ms, placed: final});
     });
+
+/**
+ * Formats a date
+ * @param {date} date the date
+ * @return {string} returns date
+ */
+function formatDate(date) {
+    const d = new Date(date);
+    let month = "" + (d.getMonth() + 1);
+    let day = "" + d.getDate();
+    const year = d.getFullYear();
+
+    if (month.length < 2) {
+        month = "0" + month;
+    }
+    if (day.length < 2) {
+        day = "0" + day;
+    }
+
+    return [day, month, year].join("/");
+}
