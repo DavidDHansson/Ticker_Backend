@@ -15,7 +15,7 @@ exports.home = functions
         const per = Number(req.query.per ?? 20);
         const page = Number(req.query.page ?? 1);
 
-        const articlesCollection = db.collection("euroinvestorarticles");
+        const articlesCollection = db.collection("articles");
 
         // Get content and prepare for page
         const first = articlesCollection.where("provider", "==", "euroinvestor").orderBy("date").limit(1000);
@@ -32,7 +32,7 @@ exports.home = functions
         res.json(articles);
     });
 
-exports.euroinvestorscraper = functions
+exports.scraper = functions
     .region("europe-west1")
     .runWith({timeoutSeconds: 540, memory: "4GB"})
     .https.onRequest(async (req, res) => {
@@ -57,6 +57,20 @@ exports.euroinvestorscraper = functions
         const items = await page.evaluate(() => {
             const data = []; const articles = document.getElementsByTagName("article");
 
+            const d = new Date();
+            let month = "" + (d.getMonth() + 1);
+            let day = "" + d.getDate();
+            const year = d.getFullYear();
+
+            if (month.length < 2) {
+                month = "0" + month;
+            }
+            if (day.length < 2) {
+                day = "0" + day;
+            }
+
+            const finalDate = [day, month, year].join("/");
+
             articles.forEach((article) => {
                 const title = article.querySelector("div > a:last-child > h2").innerHTML;
                 const link = article.querySelector("div a:last-child").href;
@@ -64,21 +78,21 @@ exports.euroinvestorscraper = functions
 
                 data.push({title: title, link: link, img: img,
                     provider: "euroinvestor",
-                    providerText: "euroinvestor",
+                    providerText: "NYHEDER",
                     providerLink: "https://www.euroinvestor.dk",
-                    providerImage: "http://4hansson.dk/test/ticker/euroinvestorlogo.png",
-                    displayDate: formatDate(new Date()),
+                    providerImage: "https://4hansson.dk/test/ticker/euroinvestorlogo.png",
+                    displayDate: finalDate,
                 });
             });
 
-            return data;
+            return data.reverse();
         });
 
         // Operation done close browser
         await browser.close();
 
         // Get 50 latest articles from Firestore
-        const articlesCollection = db.collection("euroinvestorarticles");
+        const articlesCollection = db.collection("articles");
         const snapshot = await articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").limit(40).get();
         const articles = [];
         snapshot.forEach((doc) => articles.push(doc.data()));
@@ -92,29 +106,8 @@ exports.euroinvestorscraper = functions
 
         // Add to Firebase Firestore collection
         for (let i = 0; i < final.length; i++) {
-            await db.collection("euroinvestorarticles").add({...final[i], ...{date: admin.firestore.Timestamp.now()}});
+            await db.collection("articles").add({...final[i], ...{date: admin.firestore.Timestamp.now()}});
         }
 
         res.json({result: "success", time: ms, placed: final});
     });
-
-/**
- * Formats a date
- * @param {date} date the date
- * @return {string} returns date
- */
-function formatDate(date) {
-    const d = new Date(date);
-    let month = "" + (d.getMonth() + 1);
-    let day = "" + d.getDate();
-    const year = d.getFullYear();
-
-    if (month.length < 2) {
-        month = "0" + month;
-    }
-    if (day.length < 2) {
-        day = "0" + day;
-    }
-
-    return [day, month, year].join("/");
-}
