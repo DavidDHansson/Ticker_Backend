@@ -8,13 +8,45 @@ const db = admin.firestore();
 
 const puppeteer = require("puppeteer");
 const chromium = require("chrome-aws-lambda");
+const axios = require("axios");
+const {Article} = require("./Article");
 
 exports.home = functions
     .region("europe-west1")
     .https.onRequest(async (req, res) => {
+        // Parameters
         const per = Number(req.query.per ?? 20);
-        const page = Number(req.query.page ?? 1);
+        const page = Number(req.query.page ?? 0);
+        const redditafter = req.query.redditafter ?? "";
 
+        // --------- REDDIT ---------
+        // Fetch from endpoint
+        const subreddit = "stocks";
+        const endpoint = `https://www.reddit.com/r/${subreddit}/hot.json?${redditafter}`;
+        let redditData;
+        try {
+            redditData = await axios.get(endpoint);
+        } catch {
+            res.json("reddit error");
+            return;
+        }
+
+        const redditAmount = Math.floor(per * 0.25);
+        const redditArticles = redditData?.data.data.children.slice(2, redditAmount + 2).map((post) => {
+            return new Article(
+                post.data.title, post.data.url,
+                null, `r/${subreddit}`, null,
+                `https://www.reddit.com/r/${subreddit}`,
+                "https://styles.redditmedia.com/t5_2qjfk/styles/communityIcon_4s2v8euutis11.png?width=256&s=242549c1ad52728c825dfe24af8467626e68f392",
+                new Date(post.data.created_utc * 1000),
+                post.data.name,
+            );
+        }) ?? [];
+
+        // TODO: Set all reddit articles reddit id to be the very very last id of the call
+
+        res.json(redditArticles);
+        // --------- FIREBASE ARTICLES ---------
         const articlesCollection = db.collection("articles");
 
         // Get content and prepare for page
@@ -29,7 +61,20 @@ exports.home = functions
         // Process and return
         const articles = [];
         snapshot.forEach((doc) => articles.push(doc.data()));
-        res.json(articles);
+
+        // --------- RETURN ---------
+        // Combine and shuffle array
+        const allArticles = [...articles, ...redditArticles];
+        let currentIndex = allArticles.length; let temporaryValue; let randomIndex;
+        while (0 !== currentIndex) {
+            randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex -= 1;
+            temporaryValue = allArticles[currentIndex];
+            allArticles[currentIndex] = allArticles[randomIndex];
+            allArticles[randomIndex] = temporaryValue;
+        }
+
+        res.json(allArticles);
     });
 
 exports.scraper = functions
