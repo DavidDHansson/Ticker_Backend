@@ -17,12 +17,11 @@ exports.home = functions
         // Parameters
         const per = Number(req.query.per ?? 20);
         const page = Number(req.query.page ?? 0);
-        const redditafter = req.query.redditafter ?? "";
 
         // --------- REDDIT ---------
         // Fetch from endpoint
         const subreddit = "stocks";
-        const endpoint = `https://www.reddit.com/r/${subreddit}/hot.json?${redditafter}`;
+        const endpoint = `https://www.reddit.com/r/${subreddit}/hot.json`;
         let redditData;
         try {
             redditData = await axios.get(endpoint);
@@ -31,32 +30,35 @@ exports.home = functions
             return;
         }
 
-        const redditAmount = Math.floor(per * 0.25);
-        const redditArticles = redditData?.data.data.children.slice(2, redditAmount + 2).map((post) => {
+        // Pagination
+        const amountOfStickyPost = 2;
+        const redditStart = (Math.floor(per * 0.25) * page) + amountOfStickyPost;
+        const redditEnd = Math.floor(per * 0.25) + redditStart;
+        const redditAmount = redditEnd > redditData?.data.data.children.length ? 0 : Math.floor(per * 0.25);
+
+        // Get and process data
+        const redditArticles = redditData?.data.data.children.slice(redditStart, redditEnd).map((post) => {
             return new Article(
                 post.data.title, post.data.url,
-                null, `r/${subreddit}`, null,
+                null, `r/${subreddit}`, `Upvotes: ${post.data.ups}`,
                 `https://www.reddit.com/r/${subreddit}`,
                 "https://styles.redditmedia.com/t5_2qjfk/styles/communityIcon_4s2v8euutis11.png?width=256&s=242549c1ad52728c825dfe24af8467626e68f392",
                 new Date(post.data.created_utc * 1000),
-                post.data.name,
             );
         }) ?? [];
 
-        // TODO: Set all reddit articles reddit id to be the very very last id of the call
-
-        res.json(redditArticles);
         // --------- FIREBASE ARTICLES ---------
         const articlesCollection = db.collection("articles");
 
         // Get content and prepare for page
+        const newPer = per - redditAmount;
         const first = articlesCollection.where("provider", "==", "euroinvestor").orderBy("date").limit(1000);
         const allContent = await first.get();
-        const push = page == 0 ? 1 : (per * page);
+        const push = page == 0 ? 1 : (newPer * page);
         const last = allContent.docs[allContent.docs.length - push];
 
         // Get snapshot from page
-        const snapshot = await articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").startAt(last.data().date).limit(per).get();
+        const snapshot = await articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").startAt(last.data().date).limit(newPer).get();
 
         // Process and return
         const articles = [];
@@ -64,7 +66,7 @@ exports.home = functions
 
         // --------- RETURN ---------
         // Combine and shuffle array
-        const allArticles = [...articles, ...redditArticles];
+        const allArticles = [...articles, ...(redditAmount == 0 ? [] : redditArticles)];
         let currentIndex = allArticles.length; let temporaryValue; let randomIndex;
         while (0 !== currentIndex) {
             randomIndex = Math.floor(Math.random() * currentIndex);

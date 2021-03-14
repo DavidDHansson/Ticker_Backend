@@ -2,7 +2,7 @@
 /* eslint-disable require-jsdoc */
 
 class Article {
-    constructor(title, link, img, provider, providerText, providerLink, providerImage, displayDate, redditId) {
+    constructor(title, link, img, provider, providerText, providerLink, providerImage, displayDate) {
         this.title = title;
         this.link = link;
         this.img = img;
@@ -11,7 +11,6 @@ class Article {
         this.providerLink = providerLink;
         this.providerImage = providerImage;
         this.displayDate = this.formatDate(displayDate);
-        this.redditId = redditId;
     }
 
     formatDate(d) {
