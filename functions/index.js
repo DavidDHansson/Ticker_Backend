@@ -21,7 +21,7 @@ exports.home = functions
         // --------- REDDIT ---------
         // Fetch from endpoint
         const subreddit = "stocks";
-        const endpoint = `https://www.reddit.com/r/${subreddit}/hot.json`;
+        const endpoint = `https://www.reddit.com/r/${subreddit}/top/.json`;
         let redditData;
         try {
             redditData = await axios.get(endpoint);
@@ -65,18 +65,20 @@ exports.home = functions
         snapshot.forEach((doc) => articles.push(doc.data()));
 
         // --------- RETURN ---------
-        // Combine and shuffle array
-        const allArticles = [...articles, ...(redditAmount == 0 ? [] : redditArticles)];
-        let currentIndex = allArticles.length; let temporaryValue; let randomIndex;
-        while (0 !== currentIndex) {
-            randomIndex = Math.floor(Math.random() * currentIndex);
-            currentIndex -= 1;
-            temporaryValue = allArticles[currentIndex];
-            allArticles[currentIndex] = allArticles[randomIndex];
-            allArticles[randomIndex] = temporaryValue;
-        }
+        // Combine arrays
+        if (redditAmount > 0) {
+            const redditOffset = Math.ceil(articles.length / redditArticles.length);
+            const allArticles = articles;
 
-        res.json(allArticles);
+            for (let i = 0; i < redditArticles.length; i++) {
+                allArticles.splice(redditOffset * (i + 1), 0, redditArticles[i]);
+            }
+
+            res.json(allArticles);
+        } else {
+            const allArticles = [...articles, ...(redditAmount == 0 ? [] : redditArticles)];
+            res.json(allArticles);
+        }
     });
 
 exports.scraper = functions
