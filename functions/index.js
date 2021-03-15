@@ -31,7 +31,7 @@ exports.home = functions
         }
 
         // Pagination
-        const amountOfStickyPost = 2;
+        const amountOfStickyPost = 0;
         const redditStart = (Math.floor(per * 0.25) * page) + amountOfStickyPost;
         const redditEnd = Math.floor(per * 0.25) + redditStart;
         const redditAmount = redditEnd > redditData?.data.data.children.length ? 0 : Math.floor(per * 0.25);
