@@ -21,7 +21,7 @@ exports.home = functions
         // --------- REDDIT ---------
         // Fetch from endpoint
         const subreddit = "stocks";
-        const endpoint = `https://www.reddit.com/r/${subreddit}/top/.json`;
+        const endpoint = `https://www.reddit.com/r/${subreddit}/top.json`;
         let redditData;
         try {
             redditData = await axios.get(endpoint);
