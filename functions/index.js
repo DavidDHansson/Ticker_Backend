@@ -81,6 +81,60 @@ exports.home = functions
         }
     });
 
+exports.drscraper = functions
+    .region("europe-west1")
+    .runWith({timeoutSeconds: 540, memory: "4GB"})
+    .https.onRequest(async (req, res) => {
+        const browser = await puppeteer.launch({
+            args: [
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+                "--disable-setuid-sandbox",
+                "--no-first-run",
+                "--no-sandbox",
+                "--no-zygote",
+                "--single-process",
+            ],
+            defaultViewport: chromium.defaultViewport,
+            headless: chromium.headless,
+        });
+        const page = await browser.newPage();
+        await page.goto("https://www.dr.dk/nyheder/penge");
+        await page.waitForSelector(".hydra-site-front-page-content");
+
+        // TODO:
+        // Special case for videoes
+        // Desc
+        // Date
+        // Titlte
+        // Link
+        // Image
+        // ProviderText: eg. "kontant", "penge"
+
+        const items = await page.evaluate(() => {
+            const chunks = document.querySelectorAll(".hydra-site-front-page-content")[0].childNodes;
+            const data = [];
+
+            chunks.forEach((article) => {
+                const sections = article.querySelectorAll("li");
+
+                for (let i = 0; i < sections.length; i++) {
+                    const title = sections[i].querySelectorAll("a")[1];
+                    title != undefined ? data.push(i + " " + title.getAttribute("aria-label")) : data.push("BREAK PÅ: " + i);
+                }
+            });
+
+            return data;
+        });
+
+        // Operation done close browser
+        await browser.close();
+
+        functions.logger.log(items);
+        res.json(items);
+        return;
+    });
+
 exports.scraper = functions
     .region("europe-west1")
     .runWith({timeoutSeconds: 540, memory: "4GB"})
