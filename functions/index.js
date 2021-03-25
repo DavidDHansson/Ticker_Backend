@@ -104,11 +104,7 @@ exports.drscraper = functions
 
         // TODO:
         // Special case for videoes
-        // Desc
         // Date
-        // Titlte
-        // Link
-        // Image
         // ProviderText: eg. "kontant", "penge"
 
         const items = await page.evaluate(() => {
@@ -120,7 +116,22 @@ exports.drscraper = functions
 
                 for (let i = 0; i < sections.length; i++) {
                     const title = sections[i].querySelectorAll("a")[1];
-                    title != undefined ? data.push(i + " " + title.getAttribute("aria-label")) : data.push("BREAK PÅ: " + i);
+                    const img = sections[i].querySelectorAll("source")[0];
+
+                    if (title == null) {
+                        break;
+                    }
+
+                    data.push({
+                        title: title != null ? title.getAttribute("aria-label") : "",
+                        link: title != null ? title.getAttribute("href") : "",
+                        img: img && `https://www.dr.dk/${img.getAttribute("srcset").split(" ")[2]}`,
+                        provider: "DR - Penge",
+                        providerText: "",
+                        providerLink: "https://www.dr.dk/nyheder/penge",
+                        providerImage: "",
+                        displayDate: "",
+                    });
                 }
             });
 
