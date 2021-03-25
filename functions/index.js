@@ -104,6 +104,7 @@ exports.drscraper = functions
 
         // TODO:
         // Special case for videoes
+        // Maybe special case for "tema"
         // Date
         // ProviderText: eg. "kontant", "penge"
 
