@@ -18,6 +18,24 @@ exports.home = functions
         const per = Number(req.query.per ?? 20);
         const page = Number(req.query.page ?? 0);
 
+        /**
+        * Combines 2 arrays.
+        * @param {array} first The first array.
+        * @param {array} second The second array.
+        * @return {array} the combined arrays.
+        */
+        function combine(first, second) {
+            const min = Math.min(first.length, second.length);
+            let i = 0;
+            const result = [];
+
+            while (i < min) {
+                result.push(first[i], second[i]);
+                ++i;
+            }
+            return result.concat(first.slice(min), second.slice(min));
+        }
+
         // --------- REDDIT ---------
         // Fetch from endpoint
         const subreddit = "stocks";
@@ -47,11 +65,11 @@ exports.home = functions
             );
         }) ?? [];
 
-        // --------- FIREBASE ARTICLES ---------
+        // --------- FIREBASE EUROINVESTER ARTICLES ---------
         const articlesCollection = db.collection("articles");
 
         // Get content and prepare for page
-        const newPer = per - redditAmount;
+        const newPer = Math.floor((per - redditAmount)/2);
         const first = articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").limit(300);
         const allContent = await first.get();
         const push = page == 0 ? 1 : (newPer * page);
@@ -64,19 +82,29 @@ exports.home = functions
         const articles = [];
         snapshot.forEach((doc) => articles.push(doc.data()));
 
+        // --------- FIREBASE DR-PENGE ARTICLES ---------
+        const drCollection = db.collection("drarticles");
+        const drfirst = drCollection.where("provider", "==", "DR - Penge").orderBy("date", "desc").limit(300);
+
+        const drAllContent = await drfirst.get();
+        const drlast = drAllContent.docs[drAllContent.docs.length - push];
+
+        // Get snapshot from page
+        const drSnapshot = await drCollection.where("provider", "==", "DR - Penge").orderBy("date", "desc").startAt(drlast.data()).limit(newPer).get();
+
+        // Process and return
+        const drArticles = [];
+        drSnapshot.forEach((doc) => drArticles.push(doc.data()));
+
         // --------- RETURN ---------
-        // Combine arrays
+        // Combine firebase arrays
+        const allArticles = combine(drArticles, articles);
+
+        // Combine with reddit
         if (redditAmount > 0) {
-            const redditOffset = Math.ceil(articles.length / redditArticles.length);
-            const allArticles = articles;
-
-            for (let i = 0; i < redditArticles.length; i++) {
-                allArticles.splice(redditOffset * (i + 1), 0, redditArticles[i]);
-            }
-
-            res.json(allArticles);
+            res.json(combine(allArticles, redditArticles));
         } else {
-            const allArticles = [...articles, ...(redditAmount == 0 ? [] : redditArticles)];
+            const allArticles = [...allArticles, ...(redditAmount == 0 ? [] : redditArticles)];
             res.json(allArticles);
         }
     });
