@@ -106,9 +106,22 @@ exports.drscraper = functions
         // Special case for videoes
         // Maybe special case for "tema"
         // Date
-        // ProviderText: eg. "kontant", "penge"
 
         const items = await page.evaluate(() => {
+            const d = new Date();
+            let month = "" + (d.getMonth() + 1);
+            let day = "" + d.getDate();
+            const year = d.getFullYear();
+
+            if (month.length < 2) {
+                month = "0" + month;
+            }
+            if (day.length < 2) {
+                day = "0" + day;
+            }
+
+            const finalDate = [day, month, year].join("/");
+
             const chunks = document.querySelectorAll(".hydra-site-front-page-content")[0].childNodes;
             const data = [];
 
@@ -116,22 +129,38 @@ exports.drscraper = functions
                 const sections = article.querySelectorAll("li");
 
                 for (let i = 0; i < sections.length; i++) {
-                    const title = sections[i].querySelectorAll("a")[1];
+                    const titleEl = sections[i].querySelectorAll("a")[sections[i].querySelectorAll("a").length - 1];
+                    const title = titleEl.getAttribute("aria-label");
                     const img = sections[i].querySelectorAll("source")[0];
+                    const date = sections[i].querySelectorAll(".dre-teaser-meta__part");
+                    let dateString = "";
 
-                    if (title == null) {
+                    if (title == null || title == undefined) {
                         break;
                     }
 
+                    // Format date into normal one, if date includes "i dag" or "i går"
+                    if (date && date[1].innerHTML) {
+                        const raw = date && date[1].innerHTML;
+                        if (raw.includes("går") || raw.includes("dag")) {
+                            dateString = `${raw.split("kl. ")[1]} ${finalDate}`;
+                        } else if (raw.includes("siden")) {
+                            dateString = finalDate;
+                        } else {
+                            dateString = raw;
+                        }
+                    }
+
                     data.push({
-                        title: title != null ? title.getAttribute("aria-label") : "",
-                        link: title != null ? title.getAttribute("href") : "",
-                        img: img && `https://www.dr.dk/${img.getAttribute("srcset").split(" ")[2]}`,
+                        title: title.split(", fra")[0],
+                        link: `https://www.dr.dk${titleEl.getAttribute("href")}`,
+                        img: img && img.getAttribute("srcset").split(" ")[2],
                         provider: "DR - Penge",
-                        providerText: "",
+                        // eslint-disable-next-line no-useless-escape
+                        providerText: `Fra${title.split(", fra")[1]}`.replace(/\"/g, ""),
                         providerLink: "https://www.dr.dk/nyheder/penge",
-                        providerImage: "",
-                        displayDate: "",
+                        providerImage: "https://4hansson.dk/test/ticker/drlogo.png",
+                        displayDate: dateString,
                     });
                 }
             });
