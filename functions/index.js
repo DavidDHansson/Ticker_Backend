@@ -85,6 +85,7 @@ exports.drscraper = functions
     .region("europe-west1")
     .runWith({timeoutSeconds: 540, memory: "4GB"})
     .https.onRequest(async (req, res) => {
+        const start = new Date().getTime();
         const browser = await puppeteer.launch({
             args: [
                 "--disable-gpu",
@@ -101,11 +102,6 @@ exports.drscraper = functions
         const page = await browser.newPage();
         await page.goto("https://www.dr.dk/nyheder/penge");
         await page.waitForSelector(".hydra-site-front-page-content");
-
-        // TODO:
-        // Special case for videoes
-        // Maybe special case for "tema"
-        // Date
 
         const items = await page.evaluate(() => {
             const d = new Date();
@@ -171,8 +167,26 @@ exports.drscraper = functions
         // Operation done close browser
         await browser.close();
 
-        functions.logger.log(items);
-        res.json(items);
+
+        // Get 50 latest articles from Firestore
+        const articlesCollection = db.collection("drarticles");
+        const snapshot = await articlesCollection.where("provider", "==", "DR - Penge").orderBy("date", "desc").limit(60).get();
+        const articles = [];
+        snapshot.forEach((doc) => articles.push(doc.data()));
+
+        // Remove duplicates
+        const final = items.filter((item) => !articles.find((article) => item.title === article.title));
+
+        // Add ms time
+        const ms = (new Date().getTime()) - start;
+        final.map((item) => item.time = ms);
+
+        // Add to Firebase Firestore collection
+        for (let i = 0; i < final.length; i++) {
+            await db.collection("drarticles").add({...final[i], ...{date: admin.firestore.Timestamp.now()}});
+        }
+
+        res.json({result: "success", time: ms, placed: final});
         return;
     });
 
