@@ -52,13 +52,13 @@ exports.home = functions
 
         // Get content and prepare for page
         const newPer = per - redditAmount;
-        const first = articlesCollection.where("provider", "==", "euroinvestor").orderBy("date").limit(1000);
+        const first = articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").limit(300);
         const allContent = await first.get();
         const push = page == 0 ? 1 : (newPer * page);
         const last = allContent.docs[allContent.docs.length - push];
 
         // Get snapshot from page
-        const snapshot = await articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").startAt(last.data().date).limit(newPer).get();
+        const snapshot = await articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").startAt(last.data()).limit(newPer).get();
 
         // Process and return
         const articles = [];
