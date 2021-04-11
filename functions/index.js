@@ -25,6 +25,7 @@ exports.home = functions
         // Parameters and body
         const per = Number(req.query.per ?? 20);
         const page = Number(req.query.page ?? 0);
+        // const {exclude} = JSON.stringify(req.body) !== "{}" ? JSON.parse(req.body) : {"exclude": []}; // FOR TESTING ON LOCALHOST
         const {exclude} = req.body;
 
         /**
@@ -122,7 +123,7 @@ exports.home = functions
         // --------- RETURN ---------
         // Combine firebase arrays
         const firebaseArticles = combine(drArticles, euroArticles);
-        const allArticles = combine(firebaseArticles, (redditAmount == 0 ? [] : redditArticles));
+        const allArticles = combine(firebaseArticles, redditArticles);
         res.json(allArticles);
     });
 
