@@ -297,3 +297,14 @@ exports.scraper = functions
 
         res.json({result: "success", time: ms, placed: final});
     });
+
+exports.providers = functions
+    .region("europe-west1")
+    .https.onRequest((req, res) => {
+        const providers = [
+            {title: "euroinvester", id: "euroinvester"},
+            {title: "r/stocks", id: "reddit"},
+            {title: "DR Penge", id: "dr"},
+        ];
+        res.json(providers);
+    });
