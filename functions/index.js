@@ -11,12 +11,21 @@ const chromium = require("chrome-aws-lambda");
 const axios = require("axios");
 const {Article} = require("./Article");
 
+exports.test = functions
+    .region("europe-west1")
+    .https.onRequest((req, res) => {
+        const {exclude} = req.body;
+
+        res.json(JSON.stringify(exclude));
+    });
+
 exports.home = functions
     .region("europe-west1")
     .https.onRequest(async (req, res) => {
-        // Parameters
+        // Parameters and body
         const per = Number(req.query.per ?? 20);
         const page = Number(req.query.page ?? 0);
+        const {exclude} = req.body;
 
         /**
         * Combines 2 arrays.
@@ -36,77 +45,85 @@ exports.home = functions
             return result.concat(first.slice(min), second.slice(min));
         }
 
+        // --------- VARS ---------
+        const firebaseProviders = ["euroinvester", "dr"];
+        let redditAmount = 0;
+        let redditArticles = [];
+        let euroArticles = [];
+        let drArticles = [];
+        const amountOfFirebaseArticles = firebaseProviders.reduce((a, c) => a + exclude.includes(c), 0);
+
         // --------- REDDIT ---------
         // Fetch from endpoint
-        const subreddit = "stocks";
-        const endpoint = `https://www.reddit.com/r/${subreddit}/top.json`;
-        let redditData;
-        try {
-            redditData = await axios.get(endpoint);
-        } catch {
-            res.json("reddit error");
-            return;
+        if (!exclude.includes("reddit")) {
+            const subreddit = "stocks";
+            const endpoint = `https://www.reddit.com/r/${subreddit}/top.json`;
+            let redditData;
+            try {
+                redditData = await axios.get(endpoint);
+            } catch {
+                res.json("reddit error");
+                return;
+            }
+
+            // Pagination
+            const amountOfStickyPost = 0;
+            const multiplier = (amountOfFirebaseArticles - firebaseProviders.length === 0) ? 1 : 0.25;
+            const redditStart = (Math.floor(per * multiplier) * page) + amountOfStickyPost;
+            const redditEnd = Math.floor(per * multiplier) + redditStart;
+            redditAmount = redditEnd > redditData?.data.data.children.length ? 0 : Math.floor(per * 0.25);
+
+            // Get and process data
+            redditArticles = redditData?.data.data.children.slice(redditStart, redditEnd).map((post) => {
+                return new Article(
+                    post.data.title, post.data.url,
+                    null, `r/${subreddit}`, `Upvotes: ${post.data.ups}`,
+                    `https://www.reddit.com/r/${subreddit}`,
+                    "https://styles.redditmedia.com/t5_2qjfk/styles/communityIcon_4s2v8euutis11.png?width=256&s=242549c1ad52728c825dfe24af8467626e68f392",
+                    new Date(post.data.created_utc * 1000),
+                );
+            }) ?? [];
         }
 
-        // Pagination
-        const amountOfStickyPost = 0;
-        const redditStart = (Math.floor(per * 0.25) * page) + amountOfStickyPost;
-        const redditEnd = Math.floor(per * 0.25) + redditStart;
-        const redditAmount = redditEnd > redditData?.data.data.children.length ? 0 : Math.floor(per * 0.25);
 
-        // Get and process data
-        const redditArticles = redditData?.data.data.children.slice(redditStart, redditEnd).map((post) => {
-            return new Article(
-                post.data.title, post.data.url,
-                null, `r/${subreddit}`, `Upvotes: ${post.data.ups}`,
-                `https://www.reddit.com/r/${subreddit}`,
-                "https://styles.redditmedia.com/t5_2qjfk/styles/communityIcon_4s2v8euutis11.png?width=256&s=242549c1ad52728c825dfe24af8467626e68f392",
-                new Date(post.data.created_utc * 1000),
-            );
-        }) ?? [];
+        // --------- FIREBASE CONFIG ---------
+        const newPer = Math.floor((per - redditAmount) / (amountOfFirebaseArticles == 0 ? firebaseProviders.length : amountOfFirebaseArticles));
+        const push = page == 0 ? 1 : (newPer * page);
 
         // --------- FIREBASE EUROINVESTER ARTICLES ---------
-        const articlesCollection = db.collection("articles");
+        if (!exclude.includes("euroinvester")) {
+            const articlesCollection = db.collection("articles");
 
-        // Get content and prepare for page
-        const newPer = Math.floor((per - redditAmount)/2);
-        const first = articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").limit(300);
-        const allContent = await first.get();
-        const push = page == 0 ? 1 : (newPer * page);
-        const last = allContent.docs[allContent.docs.length - push];
+            // Get content and prepare for page
+            const first = articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").limit(300);
+            const allContent = await first.get();
+            const last = allContent.docs[allContent.docs.length - push];
 
-        // Get snapshot from page
-        const snapshot = await articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").startAt(last.data()).limit(newPer).get();
-
-        // Process and return
-        const articles = [];
-        snapshot.forEach((doc) => articles.push(doc.data()));
+            // Get, process and return
+            const snapshot = await articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").startAt(last.data()).limit(newPer).get();
+            euroArticles = [];
+            snapshot.forEach((doc) => euroArticles.push(doc.data()));
+        }
 
         // --------- FIREBASE DR-PENGE ARTICLES ---------
-        const drCollection = db.collection("drarticles");
-        const drfirst = drCollection.where("provider", "==", "DR - Penge").orderBy("date", "desc").limit(300);
+        if (!exclude.includes("dr")) {
+            const drCollection = db.collection("drarticles");
+            const drfirst = drCollection.where("provider", "==", "DR - Penge").orderBy("date", "desc").limit(300);
 
-        const drAllContent = await drfirst.get();
-        const drlast = drAllContent.docs[drAllContent.docs.length - push];
+            const drAllContent = await drfirst.get();
+            const drlast = drAllContent.docs[drAllContent.docs.length - push];
 
-        // Get snapshot from page
-        const drSnapshot = await drCollection.where("provider", "==", "DR - Penge").orderBy("date", "desc").startAt(drlast.data()).limit(newPer).get();
-
-        // Process and return
-        const drArticles = [];
-        drSnapshot.forEach((doc) => drArticles.push(doc.data()));
+            // Get, process and return
+            const drSnapshot = await drCollection.where("provider", "==", "DR - Penge").orderBy("date", "desc").startAt(drlast.data()).limit(newPer).get();
+            drArticles = [];
+            drSnapshot.forEach((doc) => drArticles.push(doc.data()));
+        }
 
         // --------- RETURN ---------
         // Combine firebase arrays
-        const allArticles = combine(drArticles, articles);
-
-        // Combine with reddit
-        if (redditAmount > 0) {
-            res.json(combine(allArticles, redditArticles));
-        } else {
-            const allArticles = [...allArticles, ...(redditAmount == 0 ? [] : redditArticles)];
-            res.json(allArticles);
-        }
+        const firebaseArticles = combine(drArticles, euroArticles);
+        const allArticles = combine(firebaseArticles, (redditAmount == 0 ? [] : redditArticles));
+        res.json(allArticles);
     });
 
 exports.drscraper = functions
