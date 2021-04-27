@@ -213,7 +213,6 @@ exports.drscraper = functions
         // Operation done close browser
         await browser.close();
 
-
         // Get 50 latest articles from Firestore
         const articlesCollection = db.collection("drarticles");
         const snapshot = await articlesCollection.where("provider", "==", "DR - Penge").orderBy("date", "desc").limit(60).get();
