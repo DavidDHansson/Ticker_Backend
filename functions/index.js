@@ -77,7 +77,7 @@ exports.home = functions
             // Get and process data
             redditArticles = redditData?.data.data.children.slice(redditStart, redditEnd).map((post) => {
                 return new Article(
-                    post.data.title, post.data.url,
+                    post.data.id, post.data.title, post.data.url,
                     null, `r/${subreddit}`, `Upvotes: ${post.data.ups}`,
                     `https://www.reddit.com/r/${subreddit}`,
                     "https://styles.redditmedia.com/t5_2qjfk/styles/communityIcon_4s2v8euutis11.png?width=256&s=242549c1ad52728c825dfe24af8467626e68f392",
@@ -103,7 +103,7 @@ exports.home = functions
             // Get, process and return
             const snapshot = await articlesCollection.where("provider", "==", "euroinvestor").orderBy("date", "desc").startAt(last.data()).limit(newPer).get();
             euroArticles = [];
-            snapshot.forEach((doc) => euroArticles.push(doc.data()));
+            snapshot.forEach((doc) => euroArticles.push({id: doc.id, ...doc.data()}));
         }
 
         // --------- FIREBASE DR-PENGE ARTICLES ---------
@@ -117,7 +117,7 @@ exports.home = functions
             // Get, process and return
             const drSnapshot = await drCollection.where("provider", "==", "DR - Penge").orderBy("date", "desc").startAt(drlast.data()).limit(newPer).get();
             drArticles = [];
-            drSnapshot.forEach((doc) => drArticles.push(doc.data()));
+            drSnapshot.forEach((doc) => drArticles.push({id: doc.id, ...doc.data()}));
         }
 
         // --------- RETURN ---------

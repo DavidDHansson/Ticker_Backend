@@ -2,7 +2,8 @@
 /* eslint-disable require-jsdoc */
 
 class Article {
-    constructor(title, link, img, provider, providerText, providerLink, providerImage, displayDate) {
+    constructor(id, title, link, img, provider, providerText, providerLink, providerImage, displayDate) {
+        this.id = id;
         this.title = title;
         this.link = link;
         this.img = img;
